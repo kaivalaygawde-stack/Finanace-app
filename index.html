@@ -4,8 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Smart Finance App</title>
+
 <link rel="manifest" href="manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
 body{
 margin:0;
@@ -14,18 +16,72 @@ background:linear-gradient(135deg,#141e30,#243b55);
 color:white;
 overflow:hidden;
 }
-.screen{position:absolute;width:100%;height:100%;transition:0.4s;}
-.hidden{transform:translateX(100%);}
-.card{margin:20px;padding:20px;border-radius:20px;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);}
-.progress{height:15px;background:#333;border-radius:20px;overflow:hidden;}
-.progress-bar{height:100%;width:0%;background:lime;transition:1s;}
-.warning{background:red !important;}
-.fab{position:fixed;bottom:20px;right:20px;width:60px;height:60px;border-radius:50%;background:#00c6ff;display:flex;justify-content:center;align-items:center;font-size:30px;cursor:pointer;}
-input,select,button{width:100%;padding:10px;margin:8px 0;border-radius:10px;border:none;}
+
+.screen{
+position:absolute;
+width:100%;
+height:100%;
+transition:0.4s;
+overflow:auto;
+}
+
+.hidden{
+transform:translateX(100%);
+}
+
+.card{
+margin:20px;
+padding:20px;
+border-radius:20px;
+background:rgba(255,255,255,0.1);
+backdrop-filter:blur(10px);
+}
+
+.progress{
+height:15px;
+background:#333;
+border-radius:20px;
+overflow:hidden;
+}
+
+.progress-bar{
+height:100%;
+width:0%;
+background:lime;
+transition:1s;
+}
+
+.warning{
+background:red !important;
+}
+
+.fab{
+position:fixed;
+bottom:20px;
+right:20px;
+width:60px;
+height:60px;
+border-radius:50%;
+background:#00c6ff;
+display:flex;
+justify-content:center;
+align-items:center;
+font-size:30px;
+cursor:pointer;
+}
+
+input,select,button{
+width:100%;
+padding:10px;
+margin:8px 0;
+border-radius:10px;
+border:none;
+}
 </style>
 </head>
 <body>
 
+<!-- Lock Screen -->
 <div id="lockScreen" class="screen">
 <div class="card">
 <h2>🔒 Fingerprint Unlock</h2>
@@ -33,14 +89,33 @@ input,select,button{width:100%;padding:10px;margin:8px 0;border-radius:10px;bord
 </div>
 </div>
 
+<!-- Dashboard -->
 <div id="dashboard" class="screen hidden">
 <div class="card">
 <h3>Summary</h3>
+
+<select id="monthFilter" onchange="render()">
+<option value="all">All Months</option>
+<option value="0">Jan</option>
+<option value="1">Feb</option>
+<option value="2">Mar</option>
+<option value="3">Apr</option>
+<option value="4">May</option>
+<option value="5">Jun</option>
+<option value="6">Jul</option>
+<option value="7">Aug</option>
+<option value="8">Sep</option>
+<option value="9">Oct</option>
+<option value="10">Nov</option>
+<option value="11">Dec</option>
+</select>
+
+<br><br>
 Income ₹<span id="income">0</span><br>
 Expense ₹<span id="expense">0</span><br>
 Savings ₹<span id="savings">0</span>
 
-<h4>Budget Progress (Limit 20000)</h4>
+<h4>Budget Progress (Limit ₹20000)</h4>
 <div class="progress">
 <div id="progressBar" class="progress-bar"></div>
 </div>
@@ -53,27 +128,40 @@ Savings ₹<span id="savings">0</span>
 <div class="fab" onclick="showAdd()">+</div>
 </div>
 
+<!-- Add Screen -->
 <div id="addScreen" class="screen hidden">
 <div class="card">
 <h3>Add Transaction</h3>
+
+<input type="date" id="date">
 <input id="desc" placeholder="Description">
+
+<select id="category">
+<option>Katta Expenses</option>
+<option>Mopa Expenses</option>
+<option>Banda Expenses</option>
+</select>
+
 <input id="amount" type="number" placeholder="Amount">
+
 <select id="type">
 <option value="income">Income</option>
 <option value="expense">Expense</option>
 </select>
+
 <button onclick="addTransaction()">Save</button>
 <button onclick="back()">Back</button>
 </div>
 </div>
 
 <script>
+
 if('serviceWorker' in navigator){
 navigator.serviceWorker.register('service-worker.js');
 }
 
-let transactions=JSON.parse(localStorage.getItem("data"))||[];
-let budget=20000;
+let transactions = JSON.parse(localStorage.getItem("data")) || [];
+let budget = 20000;
 let chart;
 
 function unlock(){
@@ -91,31 +179,43 @@ document.getElementById("addScreen").classList.add("hidden");
 }
 
 function addTransaction(){
-let desc=document.getElementById("desc").value;
-let amount=parseFloat(document.getElementById("amount").value);
-let type=document.getElementById("type").value;
+let date = document.getElementById("date").value;
+let desc = document.getElementById("desc").value;
+let category = document.getElementById("category").value;
+let amount = parseFloat(document.getElementById("amount").value);
+let type = document.getElementById("type").value;
 
-if(!desc||!amount) return alert("Fill all fields");
+if(!date || !desc || !amount) return alert("Fill all fields");
 
-transactions.push({desc,amount,type});
-localStorage.setItem("data",JSON.stringify(transactions));
+transactions.push({date, desc, category, amount, type});
+localStorage.setItem("data", JSON.stringify(transactions));
+
 back();
 render();
 }
 
 function render(){
-let income=0,expense=0;
+
+let month = document.getElementById("monthFilter").value;
+let income=0, expense=0;
 let categories={};
 
 transactions.forEach(t=>{
-if(t.type=="income") income+=t.amount;
-else{
+
+let tMonth = new Date(t.date).getMonth();
+
+if(month!="all" && tMonth!=month) return;
+
+if(t.type=="income"){
+income+=t.amount;
+}else{
 expense+=t.amount;
-categories[t.desc]=(categories[t.desc]||0)+t.amount;
+categories[t.category]=(categories[t.category]||0)+t.amount;
 }
 });
 
-let savings=income-expense;
+let savings = income-expense;
+
 document.getElementById("income").innerText=income;
 document.getElementById("expense").innerText=expense;
 document.getElementById("savings").innerText=savings;
@@ -124,18 +224,25 @@ let percent=(expense/budget)*100;
 let bar=document.getElementById("progressBar");
 bar.style.width=percent+"%";
 
-if(percent>100){ bar.classList.add("warning"); }
-else{ bar.classList.remove("warning"); }
+if(percent>100){
+bar.classList.add("warning");
+}else{
+bar.classList.remove("warning");
+}
 
 if(chart) chart.destroy();
+
 chart=new Chart(document.getElementById("chart"),{
 type:'doughnut',
 data:{
 labels:Object.keys(categories),
-datasets:[{data:Object.values(categories)}]
+datasets:[{
+data:Object.values(categories)
+}]
 }
 });
 }
 </script>
+
 </body>
 </html>
