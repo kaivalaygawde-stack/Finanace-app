@@ -14,15 +14,17 @@ margin:0;
 font-family:Segoe UI;
 background:linear-gradient(135deg,#141e30,#243b55);
 color:white;
-overflow:hidden;
+overflow-x:hidden;
 }
 
 .screen{
 position:absolute;
 width:100%;
 height:100%;
-transition:0.4s;
-overflow:auto;
+top:0;
+left:0;
+overflow-y:auto;
+transition:transform 0.4s ease;
 }
 
 .hidden{
@@ -48,7 +50,7 @@ overflow:hidden;
 height:100%;
 width:0%;
 background:lime;
-transition:1s;
+transition:width 0.6s ease;
 }
 
 .warning{
@@ -68,6 +70,7 @@ justify-content:center;
 align-items:center;
 font-size:30px;
 cursor:pointer;
+box-shadow:0 5px 15px rgba(0,0,0,0.5);
 }
 
 input,select,button{
@@ -76,6 +79,13 @@ padding:10px;
 margin:8px 0;
 border-radius:10px;
 border:none;
+font-size:14px;
+}
+
+button{
+background:#00c6ff;
+color:white;
+cursor:pointer;
 }
 </style>
 </head>
@@ -94,7 +104,7 @@ border:none;
 <div class="card">
 <h3>Summary</h3>
 
-<select id="monthFilter" onchange="render()">
+<select id="monthFilter">
 <option value="all">All Months</option>
 <option value="0">Jan</option>
 <option value="1">Feb</option>
@@ -155,21 +165,25 @@ Savings ₹<span id="savings">0</span>
 </div>
 
 <script>
-
 if('serviceWorker' in navigator){
-navigator.serviceWorker.register('service-worker.js');
+navigator.serviceWorker.register('./service-worker.js');
 }
 
 let transactions = JSON.parse(localStorage.getItem("data")) || [];
 let budget = 20000;
 let chart;
 
+// Set default date
+document.getElementById("date").valueAsDate = new Date();
+
+// Unlock
 function unlock(){
 document.getElementById("lockScreen").classList.add("hidden");
 document.getElementById("dashboard").classList.remove("hidden");
 render();
 }
 
+// Navigation
 function showAdd(){
 document.getElementById("addScreen").classList.remove("hidden");
 }
@@ -178,22 +192,31 @@ function back(){
 document.getElementById("addScreen").classList.add("hidden");
 }
 
+// Add Transaction
 function addTransaction(){
 let date = document.getElementById("date").value;
-let desc = document.getElementById("desc").value;
+let desc = document.getElementById("desc").value.trim();
 let category = document.getElementById("category").value;
 let amount = parseFloat(document.getElementById("amount").value);
 let type = document.getElementById("type").value;
 
-if(!date || !desc || !amount) return alert("Fill all fields");
+if(!date || !desc || isNaN(amount) || amount<=0){
+alert("Please fill valid data");
+return;
+}
 
 transactions.push({date, desc, category, amount, type});
 localStorage.setItem("data", JSON.stringify(transactions));
+
+document.getElementById("desc").value="";
+document.getElementById("amount").value="";
+document.getElementById("date").valueAsDate = new Date();
 
 back();
 render();
 }
 
+// Render Dashboard
 function render(){
 
 let month = document.getElementById("monthFilter").value;
@@ -201,26 +224,26 @@ let income=0, expense=0;
 let categories={};
 
 transactions.forEach(t=>{
-
 let tMonth = new Date(t.date).getMonth();
-
 if(month!="all" && tMonth!=month) return;
 
-if(t.type=="income"){
-income+=t.amount;
+if(t.type==="income"){
+income += t.amount;
 }else{
-expense+=t.amount;
-categories[t.category]=(categories[t.category]||0)+t.amount;
+expense += t.amount;
+categories[t.category] = (categories[t.category]||0) + t.amount;
 }
 });
 
-let savings = income-expense;
+let savings = income - expense;
 
-document.getElementById("income").innerText=income;
-document.getElementById("expense").innerText=expense;
-document.getElementById("savings").innerText=savings;
+document.getElementById("income").innerText=income.toFixed(2);
+document.getElementById("expense").innerText=expense.toFixed(2);
+document.getElementById("savings").innerText=savings.toFixed(2);
 
-let percent=(expense/budget)*100;
+// Budget Progress
+let percent = expense>0 ? (expense/budget)*100 : 0;
+percent = Math.min(percent,150);
 let bar=document.getElementById("progressBar");
 bar.style.width=percent+"%";
 
@@ -230,7 +253,12 @@ bar.classList.add("warning");
 bar.classList.remove("warning");
 }
 
+// Chart Safe Render
 if(chart) chart.destroy();
+
+if(Object.keys(categories).length===0){
+categories = {"No Data":1};
+}
 
 chart=new Chart(document.getElementById("chart"),{
 type:'doughnut',
@@ -239,9 +267,17 @@ labels:Object.keys(categories),
 datasets:[{
 data:Object.values(categories)
 }]
+},
+options:{
+responsive:true,
+maintainAspectRatio:false
 }
 });
 }
+
+// Month change event
+document.getElementById("monthFilter").addEventListener("change",render);
+
 </script>
 
 </body>
